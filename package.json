@@ -1,0 +1,13 @@
+{
+  "name": "me-view-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "concurrently -k -n backend,frontend -c blue,green \"cd backend && uv run uvicorn me_view.main:app --reload --app-dir src\" \"cd frontend && npm run dev\"",
+    "dev:backend": "cd backend && uv run uvicorn me_view.main:app --reload --app-dir src",
+    "dev:frontend": "cd frontend && npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

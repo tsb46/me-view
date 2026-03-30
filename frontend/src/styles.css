@@ -1,0 +1,504 @@
+:root {
+  color: #152125;
+  background:
+    radial-gradient(circle at top left, rgba(202, 97, 63, 0.16), transparent 32%),
+    radial-gradient(circle at top right, rgba(22, 101, 110, 0.16), transparent 28%),
+    linear-gradient(180deg, #efe9db 0%, #e7decb 100%);
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  border-radius: 999px;
+  background: #0f3b46;
+  color: #f7f3eb;
+  cursor: pointer;
+  padding: 0.7rem 1.15rem;
+}
+
+button.active {
+  background: #d44f2a;
+}
+
+button.secondary-button {
+  background: rgba(15, 59, 70, 0.08);
+  color: #0f3b46;
+}
+
+.app-shell {
+  margin: 0 auto;
+  max-width: 1600px;
+  padding: 1.5rem;
+}
+
+.hero {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.hero h1 {
+  font-size: clamp(2rem, 5vw, 4rem);
+  line-height: 0.95;
+  margin: 0;
+}
+
+.hero p {
+  margin: 0.4rem 0 0;
+  max-width: 62ch;
+}
+
+.hero-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  text-align: right;
+}
+
+.eyebrow {
+  color: #a1492b;
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  margin: 0 0 0.25rem;
+  text-transform: uppercase;
+}
+
+.panel {
+  backdrop-filter: blur(16px);
+  background: rgba(251, 247, 240, 0.84);
+  border: 1px solid rgba(21, 33, 37, 0.08);
+  border-radius: 24px;
+  box-shadow: 0 20px 60px rgba(27, 33, 38, 0.08);
+  padding: 1rem;
+}
+
+.session-banner {
+  margin-bottom: 1rem;
+}
+
+.session-banner-main {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.session-banner h2 {
+  margin: 0;
+}
+
+.session-banner-copy {
+  margin-bottom: 0;
+}
+
+.session-banner-ready {
+  border-color: rgba(27, 107, 115, 0.22);
+}
+
+.session-banner-needs_review {
+  border-color: rgba(161, 73, 43, 0.22);
+}
+
+.session-banner-error {
+  border-color: rgba(156, 50, 24, 0.3);
+}
+
+.session-banner-stats {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(3, minmax(84px, 1fr));
+  min-width: 280px;
+}
+
+.session-banner-stats > div {
+  background: rgba(253, 249, 241, 0.88);
+  border-radius: 16px;
+  padding: 0.75rem;
+  text-align: center;
+}
+
+.session-banner-list p {
+  margin: 0.35rem 0 0;
+}
+
+.upload-form,
+.control-bar {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.control-bar label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 180px;
+}
+
+.control-bar .range-control {
+  min-width: 220px;
+}
+
+.control-bar .range-control span {
+  color: #4e5d63;
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.control-bar input[type="range"] {
+  width: 100%;
+}
+
+.layout-toggle {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.checkbox-toggle {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  gap: 0.5rem;
+  min-width: auto;
+}
+
+.checkbox-toggle input {
+  accent-color: #0f3b46;
+}
+
+.review-header,
+.dataset-review-head,
+.review-actions {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.review-header {
+  margin-bottom: 1rem;
+}
+
+.review-badge {
+  align-items: center;
+  background: rgba(161, 73, 43, 0.1);
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  padding: 0.8rem 1rem;
+}
+
+.review-badge strong {
+  font-size: 1.8rem;
+}
+
+.review-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.dataset-review-card {
+  background: rgba(253, 249, 241, 0.9);
+  border: 1px solid rgba(21, 33, 37, 0.08);
+  border-radius: 18px;
+  padding: 1rem;
+}
+
+.dataset-review-head {
+  margin-bottom: 0.85rem;
+}
+
+.dataset-review-head h3,
+.dataset-review-head p {
+  margin: 0;
+}
+
+.dataset-review-head p {
+  margin-top: 0.25rem;
+}
+
+.dataset-metadata {
+  color: #4e5d63;
+  display: flex;
+  flex-direction: column;
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  gap: 0.25rem;
+  text-align: right;
+}
+
+.review-grid {
+  align-items: center;
+  column-gap: 1rem;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(160px, 180px) minmax(120px, 140px);
+  padding: 0.55rem 0;
+}
+
+.review-grid-header {
+  border-bottom: 1px solid rgba(21, 33, 37, 0.08);
+  color: #4e5d63;
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.review-grid select {
+  width: 100%;
+}
+
+.review-error {
+  margin-bottom: 0;
+}
+
+.review-actions {
+  border-top: 1px solid rgba(21, 33, 37, 0.08);
+  padding-top: 1rem;
+}
+
+.review-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.sr-only {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  width: 1px;
+}
+
+.main-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1.8fr) minmax(360px, 0.95fr);
+}
+
+.side-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.viewer-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+.viewer-grid.compare {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.viewer-card {
+  background: #112127;
+  border-radius: 20px;
+  overflow: hidden;
+  padding: 0.75rem;
+}
+
+.viewer-card header {
+  align-items: baseline;
+  color: #f7f3eb;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.viewer-card h3 {
+  margin: 0;
+}
+
+.viewer-canvas-shell {
+  aspect-ratio: 16 / 9;
+  background: #091015;
+  border-radius: 16px;
+  height: clamp(320px, 52vh, 640px);
+  max-height: 640px;
+  min-height: 320px;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.viewer-overlay {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  inset: 0;
+  justify-content: center;
+  padding: 1.5rem;
+  position: absolute;
+  text-align: center;
+}
+
+.viewer-overlay-error {
+  background: rgba(9, 16, 21, 0.78);
+  color: #f7f3eb;
+}
+
+.viewer-overlay-error p,
+.viewer-overlay-error strong {
+  margin: 0;
+}
+
+.viewer-overlay-error p {
+  margin-top: 0.45rem;
+  max-width: 48ch;
+}
+
+.viewer-canvas {
+  background: #091015;
+  display: block;
+  height: 100%;
+  inset: 0;
+  position: absolute;
+  width: 100%;
+}
+
+.plot-panel {
+  display: grid;
+  gap: 1rem;
+  grid-template-rows: repeat(2, minmax(280px, 1fr));
+}
+
+.plot-card {
+  min-height: 280px;
+}
+
+.plot-card-head {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.plot-status {
+  color: #4e5d63;
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  font-size: 0.8rem;
+}
+
+.plot-status-error {
+  color: #9c3218;
+}
+
+.empty-copy,
+.error-text,
+.warning-text,
+.field-note {
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+}
+
+.error-text {
+  color: #9c3218;
+}
+
+.warning-text,
+.field-note-warning {
+  color: #8a5a10;
+}
+
+.field-note,
+.warning-text,
+.error-text {
+  margin: 0;
+}
+
+.field-note {
+  font-size: 0.8rem;
+}
+
+.field-note-error {
+  color: #9c3218;
+}
+
+.inspector-grid {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.label {
+  color: #4e5d63;
+  display: block;
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  font-size: 0.82rem;
+  margin-bottom: 0.2rem;
+}
+
+.empty-state {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 320px;
+  text-align: center;
+}
+
+@media (max-width: 1080px) {
+  .main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-meta {
+    text-align: left;
+  }
+
+  .session-banner-main {
+    flex-direction: column;
+  }
+
+  .session-banner-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    min-width: 0;
+    width: 100%;
+  }
+
+  .review-header,
+  .dataset-review-head,
+  .review-actions {
+    flex-direction: column;
+  }
+
+  .dataset-metadata {
+    text-align: left;
+  }
+
+  .review-grid {
+    grid-template-columns: 1fr;
+    row-gap: 0.35rem;
+  }
+
+  .review-grid-header {
+    display: none;
+  }
+}
