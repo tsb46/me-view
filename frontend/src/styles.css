@@ -300,13 +300,14 @@ button.secondary-button {
 .main-grid {
   display: grid;
   gap: 1rem;
-  grid-template-columns: minmax(0, 1.8fr) minmax(360px, 0.95fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.side-column {
-  display: flex;
-  flex-direction: column;
+.analytics-grid {
+  align-items: start;
+  display: grid;
   gap: 1rem;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.75fr);
 }
 
 .viewer-grid {
@@ -389,10 +390,15 @@ button.secondary-button {
   display: grid;
   gap: 1rem;
   grid-template-rows: repeat(2, minmax(280px, 1fr));
+  min-width: 0;
 }
 
 .plot-card {
   min-height: 280px;
+}
+
+.inspector-panel {
+  align-self: stretch;
 }
 
 .plot-card-head {
@@ -465,7 +471,7 @@ button.secondary-button {
 }
 
 @media (max-width: 1080px) {
-  .main-grid {
+  .analytics-grid {
     grid-template-columns: 1fr;
   }
 

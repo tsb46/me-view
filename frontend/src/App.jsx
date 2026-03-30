@@ -34,10 +34,10 @@ function Workspace() {
 
       <main className="main-grid">
         <ViewerWorkspace />
-        <aside className="side-column">
+        <section className="analytics-grid">
           <PlotPanel />
           <InspectorPanel />
-        </aside>
+        </section>
       </main>
     </div>
   )
