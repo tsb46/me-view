@@ -31,6 +31,11 @@ button {
   padding: 0.7rem 1.15rem;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 button.active {
   background: #d44f2a;
 }
@@ -38,6 +43,21 @@ button.active {
 button.secondary-button {
   background: rgba(15, 59, 70, 0.08);
   color: #0f3b46;
+}
+
+input,
+select,
+textarea {
+  background: rgba(253, 249, 241, 0.92);
+  border: 1px solid rgba(21, 33, 37, 0.12);
+  border-radius: 14px;
+  color: inherit;
+  padding: 0.7rem 0.85rem;
+}
+
+textarea {
+  min-height: 5.5rem;
+  resize: vertical;
 }
 
 .app-shell {
@@ -142,37 +162,108 @@ button.secondary-button {
 }
 
 .upload-form,
-.control-bar {
+.upload-form {
   align-items: end;
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
 }
 
-.control-bar label {
+.upload-field {
+  display: flex;
+  flex: 1 1 240px;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 220px;
+}
+
+.upload-field-wide {
+  flex-basis: 320px;
+}
+
+.input-hint,
+.control-hint {
+  color: #4e5d63;
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.control-panels {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(320px, 0.95fr) minmax(380px, 1.25fr);
+  margin-bottom: 1rem;
+}
+
+.control-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.control-panel-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.control-panel-header h2,
+.control-panel-header p {
+  margin: 0;
+}
+
+.control-panel-header > p {
+  color: #4e5d63;
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  max-width: 34ch;
+}
+
+.control-panel-fields {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.control-panel-fields label,
+.control-toggle-stack {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
   min-width: 180px;
 }
 
-.control-bar .range-control {
+.control-panel-fields .range-control {
+  flex: 1 1 220px;
   min-width: 220px;
 }
 
-.control-bar .range-control span {
+.control-panel-fields .range-control span {
   color: #4e5d63;
   font-family: "Avenir Next", "Helvetica Neue", sans-serif;
   font-size: 0.88rem;
   font-variant-numeric: tabular-nums;
 }
 
-.control-bar input[type="range"] {
+.control-panel-fields input[type="range"] {
   width: 100%;
+}
+
+.control-label {
+  color: #4e5d63;
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .layout-toggle {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
@@ -186,6 +277,14 @@ button.secondary-button {
 
 .checkbox-toggle input {
   accent-color: #0f3b46;
+}
+
+.checkbox-toggle-card {
+  background: rgba(253, 249, 241, 0.88);
+  border: 1px solid rgba(21, 33, 37, 0.08);
+  border-radius: 16px;
+  min-height: 49px;
+  padding: 0.7rem 0.9rem;
 }
 
 .review-header,
@@ -310,6 +409,124 @@ button.secondary-button {
   grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.75fr);
 }
 
+.time-slider-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.2rem 1.35rem 1.35rem;
+}
+
+.time-slider-header {
+  align-items: end;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.time-slider-header h2,
+.time-slider-header p {
+  margin: 0;
+}
+
+.time-slider-meta {
+  color: #4e5d63;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: flex-end;
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-slider-shell {
+  position: relative;
+  padding-top: 2rem;
+}
+
+.time-slider-bubble {
+  background: #0f3b46;
+  border-radius: 999px;
+  box-shadow: 0 12px 24px rgba(15, 59, 70, 0.24);
+  color: #f7f3eb;
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.35rem 0.7rem;
+  position: absolute;
+  top: 0;
+  white-space: nowrap;
+}
+
+.time-slider-input {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  height: 2.4rem;
+  margin: 0;
+  width: 100%;
+}
+
+.time-slider-input:focus {
+  outline: none;
+}
+
+.time-slider-input::-webkit-slider-runnable-track {
+  background: linear-gradient(
+    90deg,
+    #d44f2a 0,
+    #d44f2a var(--timepoint-progress),
+    rgba(15, 59, 70, 0.18) var(--timepoint-progress),
+    rgba(15, 59, 70, 0.18) 100%
+  );
+  border-radius: 999px;
+  height: 0.7rem;
+}
+
+.time-slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  background: #fff9ef;
+  border: 3px solid #0f3b46;
+  border-radius: 50%;
+  box-shadow: 0 8px 20px rgba(15, 59, 70, 0.22);
+  height: 1.4rem;
+  margin-top: -0.35rem;
+  width: 1.4rem;
+}
+
+.time-slider-input::-moz-range-track {
+  background: rgba(15, 59, 70, 0.18);
+  border: 0;
+  border-radius: 999px;
+  height: 0.7rem;
+}
+
+.time-slider-input::-moz-range-progress {
+  background: #d44f2a;
+  border-radius: 999px;
+  height: 0.7rem;
+}
+
+.time-slider-input::-moz-range-thumb {
+  background: #fff9ef;
+  border: 3px solid #0f3b46;
+  border-radius: 50%;
+  box-shadow: 0 8px 20px rgba(15, 59, 70, 0.22);
+  height: 1.4rem;
+  width: 1.4rem;
+}
+
+.time-slider-scale {
+  color: #4e5d63;
+  display: flex;
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  justify-content: space-between;
+  margin-top: 0.2rem;
+}
+
 .viewer-grid {
   display: grid;
   gap: 1rem;
@@ -343,12 +560,17 @@ button.secondary-button {
   aspect-ratio: 16 / 9;
   background: #091015;
   border-radius: 16px;
+  cursor: default;
   height: clamp(320px, 52vh, 640px);
   max-height: 640px;
   min-height: 320px;
   overflow: hidden;
   position: relative;
   width: 100%;
+}
+
+.viewer-canvas-shell-zooming {
+  cursor: crosshair;
 }
 
 .viewer-overlay {
@@ -384,6 +606,35 @@ button.secondary-button {
   inset: 0;
   position: absolute;
   width: 100%;
+}
+
+.viewer-zoom-box {
+  background: rgba(237, 201, 124, 0.16);
+  border: 1px solid rgba(255, 224, 160, 0.92);
+  box-shadow: 0 0 0 1px rgba(12, 19, 24, 0.28);
+  pointer-events: none;
+  position: absolute;
+  z-index: 2;
+}
+
+.viewer-reset-button {
+  background: rgba(9, 16, 21, 0.78);
+  border: 1px solid rgba(255, 244, 230, 0.24);
+  border-radius: 999px;
+  color: #f7f3eb;
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 0.42rem 0.8rem;
+  position: absolute;
+  right: 0.85rem;
+  top: 0.85rem;
+  z-index: 3;
+}
+
+.viewer-reset-button:hover {
+  background: rgba(20, 33, 40, 0.9);
 }
 
 .plot-panel {
@@ -471,6 +722,15 @@ button.secondary-button {
 }
 
 @media (max-width: 1080px) {
+  .control-panels {
+    grid-template-columns: 1fr;
+  }
+
+  .control-panel-header,
+  .time-slider-header {
+    flex-direction: column;
+  }
+
   .analytics-grid {
     grid-template-columns: 1fr;
   }
@@ -506,5 +766,9 @@ button.secondary-button {
 
   .review-grid-header {
     display: none;
+  }
+
+  .time-slider-meta {
+    justify-content: flex-start;
   }
 }

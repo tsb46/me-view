@@ -1,17 +1,37 @@
 import { createContext, useContext, useMemo, useReducer, useRef } from 'react'
 
+import { getDefaultTimeDisplayMode, normalizeTimeDisplayMode } from '../lib/time'
+
 const DEFAULT_COLORMAP = 'gray'
+const DEFAULT_CROSSHAIR_WIDTH = 1
+
+function clampCrosshairWidth(value) {
+  if (!Number.isFinite(value)) {
+    return DEFAULT_CROSSHAIR_WIDTH
+  }
+
+  return Math.min(Math.max(value, 0.1), 3)
+}
 
 function getDatasetRenderState(session, viewerUI, datasetId) {
   if (!datasetId) {
     return null
   }
 
-  const echoIds = session.datasets.find((dataset) => dataset.dataset_id === datasetId)?.echoes.map((echo) => echo.echo_id) ?? []
+  const dataset = session.datasets.find((entry) => entry.dataset_id === datasetId) ?? null
+  const echoIds = dataset?.echoes.map((echo) => echo.echo_id) ?? []
+  const echoVolumeUrlById = Object.fromEntries(
+    (dataset?.echoes ?? []).map((echo) => [echo.echo_id, echo.volume_url]),
+  )
   const discovered = viewerUI.renderMetaByDatasetId?.[datasetId]?.echoBounds ?? {}
   const values = echoIds
     .map((echoId) => discovered[echoId])
-    .filter((bounds) => Number.isFinite(bounds?.min) && Number.isFinite(bounds?.max))
+    .filter(
+      (bounds) =>
+        Number.isFinite(bounds?.min)
+        && Number.isFinite(bounds?.max)
+        && bounds?.volumeUrl === echoVolumeUrlById[bounds?.echoId],
+    )
 
   const globalMin = values.length ? Math.min(...values.map((bounds) => bounds.min)) : null
   const globalMax = values.length ? Math.max(...values.map((bounds) => bounds.max)) : null
@@ -69,6 +89,13 @@ function clampRenderValue(value, fallback) {
   return Number.isFinite(value) ? value : fallback
 }
 
+function getDatasetById(session, datasetId) {
+  if (!datasetId) {
+    return null
+  }
+  return session.datasets.find((dataset) => dataset.dataset_id === datasetId) ?? null
+}
+
 const AppStateContext = createContext(null)
 const AppDispatchContext = createContext(null)
 const ViewerRegistryContext = createContext(null)
@@ -100,6 +127,7 @@ const initialState = {
     renderMetaByDatasetId: {},
     compareOrder: [],
     showCrosshair: true,
+    crosshairWidth: DEFAULT_CROSSHAIR_WIDTH,
     interpolationEnabled: true,
   },
   plots: {
@@ -109,6 +137,7 @@ const initialState = {
     chartPrefs: {
       echoXAxisMode: 'echo_time_ms',
       timeXAxisMode: 'time_ms',
+      timeDisplayMode: 'timepoints',
     },
   },
 }
@@ -123,11 +152,12 @@ function reducer(state, action) {
     case 'session_loaded': {
       const session = action.payload
       const selectedDatasetId = session.viewer_defaults?.dataset_id ?? session.datasets[0]?.dataset_id ?? null
+      const selectedDataset = getDatasetById(session, selectedDatasetId)
       const nextViewerUI = {
         ...state.viewerUI,
+        renderMetaByDatasetId: {},
         renderPrefsByDatasetId: selectedDatasetId
           ? {
-              ...state.viewerUI.renderPrefsByDatasetId,
               [selectedDatasetId]: {
                 colormap: session.viewer_defaults?.colormap ?? DEFAULT_COLORMAP,
                 displayMin: null,
@@ -154,6 +184,13 @@ function reducer(state, action) {
           activeEchoId: session.viewer_defaults?.active_echo_id ?? session.datasets[0]?.echoes?.[0]?.echo_id ?? null,
           selectedTimepoint: session.viewer_defaults?.active_timepoint ?? 0,
           layoutMode: session.viewer_defaults?.layout ?? 'single',
+        },
+        plots: {
+          ...state.plots,
+          chartPrefs: {
+            ...state.plots.chartPrefs,
+            timeDisplayMode: getDefaultTimeDisplayMode(selectedDataset),
+          },
         },
       }
     }
@@ -201,12 +238,24 @@ function reducer(state, action) {
           selectedDatasetId: nextDataset?.dataset_id ?? null,
           activeEchoId: nextEchoId,
         },
+        plots: {
+          ...state.plots,
+          chartPrefs: {
+            ...state.plots.chartPrefs,
+            timeDisplayMode: normalizeTimeDisplayMode(state.plots.chartPrefs.timeDisplayMode, nextDataset),
+          },
+        },
       }
     }
     case 'session_failed':
       return {
         ...state,
-        session: { ...state.session, isLoading: false, loadError: action.payload, status: 'error' },
+        session: {
+          ...state.session,
+          isLoading: false,
+          loadError: action.payload,
+          status: 'error',
+        },
       }
     case 'dataset_selected':
       return {
@@ -225,10 +274,26 @@ function reducer(state, action) {
           selectedVoxelMM: null,
           isPinnedSelection: false,
         },
+        plots: {
+          ...state.plots,
+          chartPrefs: {
+            ...state.plots.chartPrefs,
+            timeDisplayMode: normalizeTimeDisplayMode(
+              state.plots.chartPrefs.timeDisplayMode,
+              getDatasetById(state.session, action.payload.datasetId),
+            ),
+          },
+        },
       }
     case 'render_bounds_discovered': {
-      const { datasetId, echoId, min, max } = action.payload
+      const { datasetId, echoId, min, max, volumeUrl } = action.payload
       if (!datasetId || !echoId || !Number.isFinite(min) || !Number.isFinite(max)) {
+        return state
+      }
+
+      const currentDataset = getDatasetById(state.session, datasetId)
+      const currentEcho = currentDataset?.echoes.find((entry) => entry.echo_id === echoId)
+      if (!currentEcho || currentEcho.volume_url !== volumeUrl) {
         return state
       }
 
@@ -238,7 +303,7 @@ function reducer(state, action) {
           ...(state.viewerUI.renderMetaByDatasetId?.[datasetId] ?? {}),
           echoBounds: {
             ...(state.viewerUI.renderMetaByDatasetId?.[datasetId]?.echoBounds ?? {}),
-            [echoId]: { min, max },
+            [echoId]: { echoId, min, max, volumeUrl },
           },
         },
       }
@@ -331,6 +396,20 @@ function reducer(state, action) {
         ...state,
         selection: { ...state.selection, selectedTimepoint: action.payload },
       }
+    case 'time_display_mode_changed':
+      return {
+        ...state,
+        plots: {
+          ...state.plots,
+          chartPrefs: {
+            ...state.plots.chartPrefs,
+            timeDisplayMode: normalizeTimeDisplayMode(
+              action.payload,
+              getDatasetById(state.session, state.selection.selectedDatasetId),
+            ),
+          },
+        },
+      }
     case 'voxel_selected':
       return {
         ...state,
@@ -350,6 +429,19 @@ function reducer(state, action) {
       return {
         ...state,
         viewerUI: { ...state.viewerUI, syncEnabled: action.payload },
+      }
+    case 'viewer_crosshair_toggled':
+      return {
+        ...state,
+        viewerUI: { ...state.viewerUI, showCrosshair: action.payload },
+      }
+    case 'viewer_crosshair_width_changed':
+      return {
+        ...state,
+        viewerUI: {
+          ...state.viewerUI,
+          crosshairWidth: clampCrosshairWidth(action.payload),
+        },
       }
     case 'viewer_ready':
       return {

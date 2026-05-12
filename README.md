@@ -11,7 +11,6 @@ Local web viewer for multi-echo fMRI datasets using a FastAPI backend, a React f
 - Show two quantitative panels:
   - echo curve at the selected voxel and current timepoint
   - time course at the selected voxel for the active echo
-- Reserve room for reversible preprocessing through `niivue-niimath` session revisions.
 
 Out of scope for this first implementation slice:
 
@@ -69,6 +68,9 @@ The Vite dev server proxies `/api` requests to the FastAPI backend on port `8000
 - Each uploaded echo is expected to be a NIfTI volume, typically one 4D file per echo.
 - Echoes in the same dataset should share spatial dimensions, affine alignment, and timepoint count.
 - Echo ordering is inferred from filenames when possible and can be finalized explicitly through the session API.
+- Session creation can optionally accept one ordered list of echo times in milliseconds and one TR value in milliseconds.
+- If multiple datasets are uploaded with manual echo times, the same ordered echo-time list is applied positionally to each dataset.
+- Shared manual echo times are accepted only when every resolved dataset has the same number of echoes; otherwise session creation rejects the manual echo-time metadata.
 
 ## Documentation map
 
@@ -77,5 +79,4 @@ The Vite dev server proxies `/api` requests to the FastAPI backend on port `8000
 - [docs/architecture.md](docs/architecture.md)
 - [docs/api.md](docs/api.md)
 - [docs/state-model.md](docs/state-model.md)
-- [docs/preprocessing.md](docs/preprocessing.md)
 - [docs/ui.md](docs/ui.md)

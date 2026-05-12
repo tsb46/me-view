@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react'
 import { NVImage } from '@niivue/niivue'
 
 import { NIIVUE_COLORMAPS } from '../lib/colormaps'
+import { TIME_DISPLAY_MODE_SECONDS, TIME_DISPLAY_MODE_TIMEPOINTS, datasetSupportsSeconds } from '../lib/time'
 import { useAppDispatch, useAppState, useActiveDataset, useActiveRenderPreferences } from '../state/app-state'
 
 function formatRangeValue(value) {
@@ -37,7 +38,7 @@ export default function ControlBar() {
     const discoveredBounds = state.viewerUI.renderMetaByDatasetId?.[dataset.dataset_id]?.echoBounds ?? {}
     const missingEchoes = dataset.echoes.filter((echo) => {
       const bounds = discoveredBounds[echo.echo_id]
-      return !Number.isFinite(bounds?.min) || !Number.isFinite(bounds?.max)
+      return !Number.isFinite(bounds?.min) || !Number.isFinite(bounds?.max) || bounds?.volumeUrl !== echo.volume_url
     })
 
     if (!missingEchoes.length) {
@@ -45,7 +46,7 @@ export default function ControlBar() {
     }
 
     missingEchoes.forEach((echo) => {
-      const requestKey = `${dataset.dataset_id}:${echo.echo_id}`
+      const requestKey = `${dataset.dataset_id}:${echo.echo_id}:${echo.volume_url}`
       if (pendingLoadsRef.current.has(requestKey)) {
         return
       }
@@ -64,6 +65,7 @@ export default function ControlBar() {
                 echoId: echo.echo_id,
                 min: volume.cal_min,
                 max: volume.cal_max,
+                volumeUrl: echo.volume_url,
               },
             })
           }
@@ -94,136 +96,204 @@ export default function ControlBar() {
   const displayMin = renderPrefs?.displayMin ?? globalMin ?? 0
   const displayMax = renderPrefs?.displayMax ?? globalMax ?? 0
   const hasBounds = Number.isFinite(globalMin) && Number.isFinite(globalMax)
+  const canDisplaySeconds = datasetSupportsSeconds(dataset)
+  const timeDisplayMode = state.plots.chartPrefs.timeDisplayMode
 
   return (
-    <section className="panel control-bar">
-      <label>
-        Dataset
-        <select
-          value={state.selection.selectedDatasetId ?? ''}
-          onChange={(event) => {
-            const nextDataset = state.session.datasets.find((entry) => entry.dataset_id === event.target.value)
-            dispatch({
-              type: 'dataset_selected',
-              payload: {
-                datasetId: event.target.value,
-                activeEchoId: nextDataset?.echoes?.[0]?.echo_id ?? null,
-              },
-            })
-          }}
-        >
-          {state.session.datasets.map((entry) => (
-            <option key={entry.dataset_id} value={entry.dataset_id}>
-              {entry.label}
-            </option>
-          ))}
-        </select>
-      </label>
+    <div className="control-panels">
+      <section className="panel control-panel control-panel-nav">
+        <div className="control-panel-header">
+          <div>
+            <p className="eyebrow">Navigation</p>
+            <h2>Dataset and echo views</h2>
+          </div>
+          <p>Choose the active dataset, switch echoes, and move between single and compare layouts.</p>
+        </div>
 
-      <label>
-        Active echo
-        <select
-          value={state.selection.activeEchoId ?? ''}
-          onChange={(event) => dispatch({ type: 'echo_selected', payload: event.target.value })}
-        >
-          {dataset.echoes.map((echo) => (
-            <option key={echo.echo_id} value={echo.echo_id}>
-              {echo.display_name}
-            </option>
-          ))}
-        </select>
-      </label>
+        <div className="control-panel-fields">
+          <label>
+            Dataset
+            <select
+              value={state.selection.selectedDatasetId ?? ''}
+              onChange={(event) => {
+                const nextDataset = state.session.datasets.find((entry) => entry.dataset_id === event.target.value)
+                dispatch({
+                  type: 'dataset_selected',
+                  payload: {
+                    datasetId: event.target.value,
+                    activeEchoId: nextDataset?.echoes?.[0]?.echo_id ?? null,
+                  },
+                })
+              }}
+            >
+              {state.session.datasets.map((entry) => (
+                <option key={entry.dataset_id} value={entry.dataset_id}>
+                  {entry.label}
+                </option>
+              ))}
+            </select>
+          </label>
 
-      <label>
-        Timepoint
-        <input
-          type="range"
-          min="0"
-          max={Math.max(0, dataset.timepoints - 1)}
-          value={state.selection.selectedTimepoint}
-          onChange={(event) => dispatch({ type: 'timepoint_selected', payload: Number(event.target.value) })}
-        />
-        <span>{state.selection.selectedTimepoint}</span>
-      </label>
+          <label>
+            Active echo
+            <select
+              value={state.selection.activeEchoId ?? ''}
+              onChange={(event) => dispatch({ type: 'echo_selected', payload: event.target.value })}
+            >
+              {dataset.echoes.map((echo) => (
+                <option key={echo.echo_id} value={echo.echo_id}>
+                  {echo.display_name}
+                </option>
+              ))}
+            </select>
+          </label>
 
-      <div className="layout-toggle">
-        <button
-          type="button"
-          className={state.selection.layoutMode === 'single' ? 'active' : ''}
-          onClick={() => dispatch({ type: 'layout_changed', payload: 'single' })}
-        >
-          Single
-        </button>
-        <button
-          type="button"
-          className={state.selection.layoutMode === 'compare' ? 'active' : ''}
-          onClick={() => dispatch({ type: 'layout_changed', payload: 'compare' })}
-        >
-          Compare
-        </button>
-      </div>
+          <div className="control-toggle-stack">
+            <span className="control-label">Viewer layout</span>
+            <div className="layout-toggle">
+              <button
+                type="button"
+                className={state.selection.layoutMode === 'single' ? 'active' : ''}
+                onClick={() => dispatch({ type: 'layout_changed', payload: 'single' })}
+              >
+                Single
+              </button>
+              <button
+                type="button"
+                className={state.selection.layoutMode === 'compare' ? 'active' : ''}
+                onClick={() => dispatch({ type: 'layout_changed', payload: 'compare' })}
+              >
+                Compare
+              </button>
+            </div>
+          </div>
 
-      {state.selection.layoutMode === 'compare' ? (
-        <label className="checkbox-toggle">
-          <input
-            type="checkbox"
-            checked={state.viewerUI.syncEnabled}
-            onChange={(event) => dispatch({ type: 'viewer_sync_toggled', payload: event.target.checked })}
-          />
-          <span>Sync compare viewers</span>
-        </label>
-      ) : null}
+          {state.selection.layoutMode === 'compare' ? (
+            <label className="checkbox-toggle checkbox-toggle-card">
+              <input
+                type="checkbox"
+                checked={state.viewerUI.syncEnabled}
+                onChange={(event) => dispatch({ type: 'viewer_sync_toggled', payload: event.target.checked })}
+              />
+              <span>Sync compare viewers</span>
+            </label>
+          ) : null}
+        </div>
+      </section>
 
-      <label>
-        Colormap
-        <select
-          value={renderPrefs?.colormap ?? 'gray'}
-          onChange={(event) => dispatch({
-            type: 'render_colormap_changed',
-            payload: { datasetId: dataset.dataset_id, colormap: event.target.value },
-          })}
-        >
-          {NIIVUE_COLORMAPS.map((colormap) => (
-            <option key={colormap} value={colormap}>
-              {colormap}
-            </option>
-          ))}
-        </select>
-      </label>
+      <section className="panel control-panel control-panel-render">
+        <div className="control-panel-header">
+          <div>
+            <p className="eyebrow">Rendering</p>
+            <h2>Colormap, time, and crosshair</h2>
+          </div>
+          <p>Adjust intensity mapping, displayed time units, and crosshair presentation without affecting the current voxel selection.</p>
+        </div>
 
-      <label className="range-control">
-        Min
-        <input
-          type="range"
-          min={hasBounds ? globalMin : 0}
-          max={hasBounds ? displayMax : 0}
-          step="any"
-          value={displayMin}
-          disabled={!hasBounds}
-          onChange={(event) => dispatch({
-            type: 'render_min_changed',
-            payload: { datasetId: dataset.dataset_id, value: Number(event.target.value) },
-          })}
-        />
-        <span>{formatRangeValue(displayMin)}</span>
-      </label>
+        <div className="control-panel-fields control-panel-fields-render">
+          <label>
+            Colormap
+            <select
+              value={renderPrefs?.colormap ?? 'gray'}
+              onChange={(event) => dispatch({
+                type: 'render_colormap_changed',
+                payload: { datasetId: dataset.dataset_id, colormap: event.target.value },
+              })}
+            >
+              {NIIVUE_COLORMAPS.map((colormap) => (
+                <option key={colormap} value={colormap}>
+                  {colormap}
+                </option>
+              ))}
+            </select>
+          </label>
 
-      <label className="range-control">
-        Max
-        <input
-          type="range"
-          min={hasBounds ? displayMin : 0}
-          max={hasBounds ? globalMax : 0}
-          step="any"
-          value={displayMax}
-          disabled={!hasBounds}
-          onChange={(event) => dispatch({
-            type: 'render_max_changed',
-            payload: { datasetId: dataset.dataset_id, value: Number(event.target.value) },
-          })}
-        />
-        <span>{formatRangeValue(displayMax)}</span>
-      </label>
-    </section>
+          <label className="range-control">
+            Min
+            <input
+              type="range"
+              min={hasBounds ? globalMin : 0}
+              max={hasBounds ? displayMax : 0}
+              step="any"
+              value={displayMin}
+              disabled={!hasBounds}
+              onChange={(event) => dispatch({
+                type: 'render_min_changed',
+                payload: { datasetId: dataset.dataset_id, value: Number(event.target.value) },
+              })}
+            />
+            <span>{formatRangeValue(displayMin)}</span>
+          </label>
+
+          <label className="range-control">
+            Max
+            <input
+              type="range"
+              min={hasBounds ? displayMin : 0}
+              max={hasBounds ? globalMax : 0}
+              step="any"
+              value={displayMax}
+              disabled={!hasBounds}
+              onChange={(event) => dispatch({
+                type: 'render_max_changed',
+                payload: { datasetId: dataset.dataset_id, value: Number(event.target.value) },
+              })}
+            />
+            <span>{formatRangeValue(displayMax)}</span>
+          </label>
+
+          <div className="control-toggle-stack">
+            <span className="control-label">Time display</span>
+            <div className="layout-toggle">
+              <button
+                type="button"
+                className={timeDisplayMode === TIME_DISPLAY_MODE_TIMEPOINTS ? 'active' : ''}
+                onClick={() => dispatch({ type: 'time_display_mode_changed', payload: TIME_DISPLAY_MODE_TIMEPOINTS })}
+              >
+                Timepoints
+              </button>
+              <button
+                type="button"
+                className={timeDisplayMode === TIME_DISPLAY_MODE_SECONDS ? 'active' : ''}
+                disabled={!canDisplaySeconds}
+                onClick={() => dispatch({ type: 'time_display_mode_changed', payload: TIME_DISPLAY_MODE_SECONDS })}
+              >
+                Seconds
+              </button>
+            </div>
+            <span className="control-hint">
+              {canDisplaySeconds
+                ? `TR ${formatRangeValue(dataset.tr_ms)} ms is available for this dataset.`
+                : 'Seconds view is unavailable until TR metadata is provided.'}
+            </span>
+          </div>
+
+          <label className="checkbox-toggle checkbox-toggle-card">
+            <input
+              type="checkbox"
+              checked={state.viewerUI.showCrosshair}
+              onChange={(event) => dispatch({ type: 'viewer_crosshair_toggled', payload: event.target.checked })}
+            />
+            <span>Show crosshair</span>
+          </label>
+
+          <label className="range-control">
+            Crosshair width
+            <input
+              type="range"
+              min="0.1"
+              max="3"
+              step="0.1"
+              value={state.viewerUI.crosshairWidth}
+              onChange={(event) => dispatch({
+                type: 'viewer_crosshair_width_changed',
+                payload: Number(event.target.value),
+              })}
+            />
+            <span>{formatRangeValue(state.viewerUI.crosshairWidth)}</span>
+          </label>
+        </div>
+      </section>
+    </div>
   )
 }

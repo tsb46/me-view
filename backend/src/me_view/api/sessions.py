@@ -7,7 +7,10 @@ from typing import Annotated
 from fastapi import APIRouter, File, Form, Response, UploadFile, status
 from fastapi.responses import FileResponse
 
-from me_view.models.session import FinalizeSessionRequest, SessionResponse
+from me_view.models.session import (
+    FinalizeSessionRequest,
+    SessionResponse,
+)
 from me_view.services.sessions import session_service
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -47,7 +50,7 @@ def delete_session(session_id: str) -> Response:
 
 @router.get("/{session_id}/datasets/{dataset_id}/assets/{asset_id}")
 def get_asset(session_id: str, dataset_id: str, asset_id: str) -> FileResponse:
-    """Serve an uploaded or derived asset file back to the frontend and NiiVue."""
+    """Serve an uploaded asset file back to the frontend and NiiVue."""
 
     asset_path = session_service.asset_path(session_id, asset_id)
     return FileResponse(asset_path, filename=asset_path.name)
