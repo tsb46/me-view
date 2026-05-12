@@ -35,9 +35,41 @@ def make_entry(filename: str, asset_id: str, echo_index: int | None) -> dict[str
     }
 
 
-def write_test_nifti(path, values) -> None:
-    image = nib.Nifti1Image(np.asarray(values, dtype=np.float32), np.eye(4))
+def write_test_nifti(path, values, affine=None) -> None:
+    affine_matrix = np.asarray(affine if affine is not None else np.eye(4), dtype=np.float32)
+    image = nib.Nifti1Image(np.asarray(values, dtype=np.float32), affine_matrix)
     nib.save(image, str(path))
+
+
+def build_encoded_echo_values(
+    spatial_shape: tuple[int, int, int], timepoints: int, echo_offset: float = 0.0
+) -> np.ndarray:
+    values = np.zeros((*spatial_shape, timepoints), dtype=np.float32)
+    for i in range(spatial_shape[0]):
+        for j in range(spatial_shape[1]):
+            for k in range(spatial_shape[2]):
+                for t in range(timepoints):
+                    values[i, j, k, t] = echo_offset + (1000 * i) + (100 * j) + (10 * k) + t
+    return values
+
+
+def expected_encoded_value(
+    ijk: tuple[int, int, int], timepoint: int, echo_offset: float = 0.0
+) -> float:
+    i, j, k = ijk
+    return float(echo_offset + (1000 * i) + (100 * j) + (10 * k) + timepoint)
+
+
+def expected_mm(affine, ijk: tuple[int, int, int]) -> tuple[float, float, float]:
+    xyz = np.asarray(affine, dtype=np.float64) @ np.asarray([ijk[0], ijk[1], ijk[2], 1.0])
+    return (float(xyz[0]), float(xyz[1]), float(xyz[2]))
+
+
+def as_4d_echo_values(values) -> np.ndarray:
+    array = np.asarray(values, dtype=np.float32)
+    if array.ndim == 1:
+        return array.reshape((1, 1, 1, array.shape[0]))
+    return array
 
 
 def make_ready_session(
@@ -45,6 +77,7 @@ def make_ready_session(
     tmp_path,
     first_echo_values=(1.0, 3.0),
     second_echo_values=(2.0, 12.0),
+    affine=None,
 ) -> tuple[str, str, str]:
     session_id = "sess_test"
     dataset_id = "ds_test"
@@ -52,8 +85,19 @@ def make_ready_session(
     asset_b = "asset_b"
     original_a = tmp_path / "echo-1.nii.gz"
     original_b = tmp_path / "echo-2.nii.gz"
-    write_test_nifti(original_a, [[[[*first_echo_values]]]])
-    write_test_nifti(original_b, [[[[*second_echo_values]]]])
+    first_echo_array = as_4d_echo_values(first_echo_values)
+    second_echo_array = as_4d_echo_values(second_echo_values)
+    affine_matrix = np.asarray(affine if affine is not None else np.eye(4), dtype=np.float32)
+    write_test_nifti(original_a, first_echo_array, affine=affine_matrix)
+    write_test_nifti(original_b, second_echo_array, affine=affine_matrix)
+
+    if first_echo_array.ndim != 4 or second_echo_array.ndim != 4:
+        raise ValueError("Test fixtures must be 4D volumes")
+    if first_echo_array.shape != second_echo_array.shape:
+        raise ValueError("Echo fixtures must share the same shape")
+
+    spatial_shape = tuple(int(axis) for axis in first_echo_array.shape[:3])
+    timepoints = int(first_echo_array.shape[3])
 
     manifest = SessionResponse(
         session_id=session_id,
@@ -64,11 +108,11 @@ def make_ready_session(
                 dataset_id=dataset_id,
                 label="dataset",
                 state=DatasetState.READY,
-                spatial_shape=(1, 1, 1),
-                timepoints=2,
+                spatial_shape=spatial_shape,
+                timepoints=timepoints,
                 voxel_size_mm=(1.0, 1.0, 1.0),
                 tr_ms=1500.0,
-                affine=np.eye(4).tolist(),
+                affine=affine_matrix.tolist(),
                 echoes=[
                     EchoManifest(
                         echo_id="echo_1",
@@ -78,7 +122,7 @@ def make_ready_session(
                         asset_id=asset_a,
                         active_asset_id=asset_a,
                         filename=original_a.name,
-                        frame_count=2,
+                        frame_count=timepoints,
                         volume_url=service._asset_url(session_id, dataset_id, asset_a),
                     ),
                     EchoManifest(
@@ -89,7 +133,7 @@ def make_ready_session(
                         asset_id=asset_b,
                         active_asset_id=asset_b,
                         filename=original_b.name,
-                        frame_count=2,
+                        frame_count=timepoints,
                         volume_url=service._asset_url(session_id, dataset_id, asset_b),
                     ),
                 ],
@@ -267,3 +311,86 @@ def test_plot_builders_read_from_original_assets(tmp_path) -> None:
         original_context.asset_id
         == service._get_record(session_id).manifest.datasets[0].echoes[0].asset_id
     )
+
+
+def test_plot_builders_report_mm_with_translated_affine(tmp_path) -> None:
+    service = SessionService()
+    affine = np.array(
+        [
+            [2.0, 0.0, 0.0, 10.0],
+            [0.0, 3.0, 0.0, -5.0],
+            [0.0, 0.0, 4.0, 7.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ],
+        dtype=np.float32,
+    )
+    first_echo = build_encoded_echo_values((3, 4, 5), 2, echo_offset=0.0)
+    second_echo = build_encoded_echo_values((3, 4, 5), 2, echo_offset=5000.0)
+    session_id, dataset_id, _ = make_ready_session(
+        service,
+        tmp_path,
+        first_echo_values=first_echo,
+        second_echo_values=second_echo,
+        affine=affine,
+    )
+
+    voxel = (2, 1, 3)
+    timepoint = 1
+    expected_coordinate_mm = expected_mm(affine, voxel)
+
+    echo_curve = service.build_echo_curve(session_id, dataset_id, *voxel, timepoint)
+    time_course = service.build_time_course(session_id, dataset_id, "echo_1", *voxel)
+    context = service.build_plot_context(session_id, dataset_id, "echo_1", *voxel, timepoint)
+
+    assert [point.value for point in echo_curve.echoes] == [
+        expected_encoded_value(voxel, timepoint, echo_offset=0.0),
+        expected_encoded_value(voxel, timepoint, echo_offset=5000.0),
+    ]
+    assert [point.value for point in time_course.series] == [
+        expected_encoded_value(voxel, 0, echo_offset=0.0),
+        expected_encoded_value(voxel, 1, echo_offset=0.0),
+    ]
+    assert context.value == expected_encoded_value(voxel, timepoint, echo_offset=0.0)
+    assert tuple(echo_curve.voxel.ijk) == voxel
+    assert tuple(time_course.voxel.ijk) == voxel
+    assert tuple(context.voxel.ijk) == voxel
+    assert tuple(echo_curve.voxel.mm) == expected_coordinate_mm
+    assert tuple(time_course.voxel.mm) == expected_coordinate_mm
+    assert tuple(context.voxel.mm) == expected_coordinate_mm
+
+
+def test_plot_builders_report_mm_with_axis_flip_affine(tmp_path) -> None:
+    service = SessionService()
+    affine = np.array(
+        [
+            [-2.0, 0.0, 0.0, 12.0],
+            [0.0, 1.5, 0.0, -3.0],
+            [0.0, 0.0, 4.0, 1.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ],
+        dtype=np.float32,
+    )
+    first_echo = build_encoded_echo_values((3, 4, 5), 2, echo_offset=0.0)
+    second_echo = build_encoded_echo_values((3, 4, 5), 2, echo_offset=8000.0)
+    session_id, dataset_id, _ = make_ready_session(
+        service,
+        tmp_path,
+        first_echo_values=first_echo,
+        second_echo_values=second_echo,
+        affine=affine,
+    )
+
+    voxel = (2, 1, 3)
+    timepoint = 1
+    expected_coordinate_mm = expected_mm(affine, voxel)
+
+    echo_curve = service.build_echo_curve(session_id, dataset_id, *voxel, timepoint)
+    context = service.build_plot_context(session_id, dataset_id, "echo_2", *voxel, timepoint)
+
+    assert [point.value for point in echo_curve.echoes] == [
+        expected_encoded_value(voxel, timepoint, echo_offset=0.0),
+        expected_encoded_value(voxel, timepoint, echo_offset=8000.0),
+    ]
+    assert context.value == expected_encoded_value(voxel, timepoint, echo_offset=8000.0)
+    assert tuple(echo_curve.voxel.mm) == expected_coordinate_mm
+    assert tuple(context.voxel.mm) == expected_coordinate_mm

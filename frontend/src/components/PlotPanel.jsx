@@ -56,8 +56,9 @@ export default function PlotPanel() {
   const echoCurveUsesEchoTime = Boolean(echoCurve?.echoes?.length) && echoCurve.echoes.every((point) => point.echo_time_ms != null)
   const echoCurveXAxisTitle = echoCurveUsesEchoTime ? 'Echo Time (ms)' : 'Echo'
   const timeSeriesX = timeCourse?.series?.map((point) => getTimeSeriesXValue(point, dataset, timeDisplayMode)) ?? []
-  const selectedTimeSeriesX =
-    timeCourse?.selected_timepoint != null ? timeSeriesX[timeCourse.selected_timepoint] ?? timeCourse.selected_timepoint : null
+  const selectedTimeSeriesX = hasVoxelSelection(voxel)
+    ? timeSeriesX[selectedTimepoint] ?? getTimeSeriesXValue({ timepoint: selectedTimepoint }, dataset, timeDisplayMode)
+    : null
 
   useEffect(() => {
     if (!sessionId || !sessionReady || !datasetId || !voxel) {
