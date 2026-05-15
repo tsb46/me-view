@@ -40,6 +40,7 @@ class EchoManifest(BaseModel):
     echo_time_ms: float | None = None
     display_name: str
     asset_id: str
+    active_asset_id: str
     filename: str
     content_type: str | None = None
     frame_count: int
@@ -101,6 +102,19 @@ class CreateSessionMetadata(BaseModel):
     allow_multiple_datasets: bool = False
     infer_echo_order: bool = True
     infer_echo_time_from_filename: bool = True
+    echo_times_ms: list[float] | None = None
+    tr_ms: float | None = None
+
+    @model_validator(mode="after")
+    def validate_optional_time_metadata(self) -> CreateSessionMetadata:
+        if self.tr_ms is not None and self.tr_ms <= 0:
+            raise ValueError("TR must be greater than 0 milliseconds")
+        if self.echo_times_ms is not None:
+            if not self.echo_times_ms:
+                raise ValueError("Echo times must contain at least one value when provided")
+            if any(value <= 0 for value in self.echo_times_ms):
+                raise ValueError("Echo times must be greater than 0 milliseconds")
+        return self
 
 
 class FinalizeEchoDecision(BaseModel):

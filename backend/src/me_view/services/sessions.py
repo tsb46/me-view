@@ -72,7 +72,7 @@ class SessionService:
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No files uploaded"
             )
 
-        self._parse_metadata(metadata_json)
+        metadata = self._parse_metadata(metadata_json)
         session_id = f"sess_{uuid.uuid4().hex[:12]}"
         created_at = datetime.now(UTC)
         session_dir = settings.session_root / session_id
@@ -83,6 +83,16 @@ class SessionService:
         errors: list[Issue] = []
 
         for file in files:
+            if not file.filename:
+                errors.append(
+                    Issue(
+                        code="MISSING_FILENAME",
+                        severity=IssueSeverity.ERROR,
+                        message="Uploaded files must include a filename.",
+                    )
+                )
+                continue
+
             file_path = session_dir / file.filename
             with file_path.open("wb") as output_handle:
                 shutil.copyfileobj(file.file, output_handle)
@@ -115,6 +125,8 @@ class SessionService:
         review_actions: list[ReviewAction] = []
         warnings: list[Issue] = []
         status_value = SessionStatus.READY
+
+        self._apply_create_metadata_overrides(metadata, datasets_by_key)
 
         for dataset_key, entries in datasets_by_key.items():
             dataset_manifest, dataset_review, dataset_warnings = self._build_dataset_manifest(
@@ -192,7 +204,8 @@ class SessionService:
         points: list[EchoCurvePoint] = []
         record = self._get_record(session_id)
         for echo in dataset.echoes:
-            dataobj = nib.load(str(self.asset_path(session_id, echo.asset_id))).dataobj
+            asset_id = echo.asset_id
+            dataobj = nib.load(str(self.asset_path(session_id, asset_id))).dataobj
             self._validate_voxel(dataobj.shape, x, y, z, timepoint=timepoint)
             value = float(dataobj[x, y, z, timepoint])
             points.append(
@@ -221,7 +234,7 @@ class SessionService:
             voxel=voxel,
             selected_timepoint=timepoint,
             active_echo_id=active_echo_id,
-            x_axis=PlotAxisMeta(key="echo_time_ms", label="Echo Time", unit="ms"),
+            x_axis=self._build_echo_curve_x_axis(points),
             y_axis=PlotAxisMeta(key="value", label="Signal Intensity"),
             echoes=points,
         )
@@ -238,7 +251,8 @@ class SessionService:
         dataset = self._get_dataset(session_id, dataset_id)
         self._ensure_ready(session_id, dataset)
         echo = self._get_echo(dataset, echo_id)
-        dataobj = nib.load(str(self.asset_path(session_id, echo.asset_id))).dataobj
+        asset_id = echo.asset_id
+        dataobj = nib.load(str(self.asset_path(session_id, asset_id))).dataobj
         self._validate_voxel(dataobj.shape, x, y, z)
         series = np.asarray(dataobj[x, y, z, :], dtype=np.float32)
 
@@ -290,7 +304,8 @@ class SessionService:
         dataset = self._get_dataset(session_id, dataset_id)
         self._ensure_ready(session_id, dataset)
         echo = self._get_echo(dataset, echo_id)
-        dataobj = nib.load(str(self.asset_path(session_id, echo.asset_id))).dataobj
+        asset_id = echo.asset_id
+        dataobj = nib.load(str(self.asset_path(session_id, asset_id))).dataobj
         self._validate_voxel(dataobj.shape, x, y, z, timepoint=timepoint)
         value = float(dataobj[x, y, z, timepoint])
         return PlotContextResponse(
@@ -306,7 +321,7 @@ class SessionService:
             ),
             value=value,
             frame_count=echo.frame_count,
-            asset_id=echo.asset_id,
+            asset_id=asset_id,
         )
 
     def _parse_metadata(self, metadata_json: str | None) -> CreateSessionMetadata:
@@ -330,6 +345,51 @@ class SessionService:
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=exc.errors(),
             ) from exc
+
+    def _apply_create_metadata_overrides(
+        self,
+        metadata: CreateSessionMetadata,
+        datasets_by_key: dict[str, list[dict[str, object]]],
+    ) -> None:
+        if metadata.tr_ms is not None:
+            for entries in datasets_by_key.values():
+                for entry in entries:
+                    entry["tr_ms"] = metadata.tr_ms
+
+        if metadata.echo_times_ms is None:
+            return
+
+        expected_count = len(metadata.echo_times_ms)
+        dataset_counts = {
+            dataset_key: len(entries) for dataset_key, entries in datasets_by_key.items()
+        }
+        mismatched = {
+            dataset_key: count
+            for dataset_key, count in dataset_counts.items()
+            if count != expected_count
+        }
+        if mismatched:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "message": (
+                        "Manual echo times must match the echo count of every resolved dataset"
+                    ),
+                    "expected_echoes_per_dataset": expected_count,
+                    "dataset_echo_counts": mismatched,
+                },
+            )
+
+        for entries in datasets_by_key.values():
+            ordered_entries = self._sort_dataset_entries(entries)
+            for entry, echo_time_ms in zip(ordered_entries, metadata.echo_times_ms, strict=True):
+                entry["echo_time_ms"] = echo_time_ms
+
+    def _build_echo_curve_x_axis(self, points: list[EchoCurvePoint]) -> PlotAxisMeta:
+        has_echo_times = bool(points) and all(point.echo_time_ms is not None for point in points)
+        if has_echo_times:
+            return PlotAxisMeta(key="echo_time_ms", label="Echo Time", unit="ms")
+        return PlotAxisMeta(key="echo_index", label="Echo")
 
     def _read_nifti_metadata(self, file_path: Path) -> dict[str, object]:
         image = nib.load(str(file_path))
@@ -384,14 +444,7 @@ class SessionService:
                     )
                 )
 
-        entries_sorted = sorted(
-            entries,
-            key=lambda entry: (
-                entry["echo_index"] is None,
-                entry["echo_index"] or 0,
-                str(entry["filename"]),
-            ),
-        )
+        entries_sorted = self._sort_dataset_entries(entries)
         echo_order_issue = self._build_echo_order_issue(entries_sorted)
         unresolved = echo_order_issue is not None
 
@@ -408,6 +461,7 @@ class SessionService:
                     echo_time_ms=entry["echo_time_ms"],
                     display_name=f"Echo {inferred_echo_index or position}",
                     asset_id=asset_id,
+                    active_asset_id=asset_id,
                     filename=str(entry["filename"]),
                     content_type=entry["content_type"],
                     frame_count=int(cast(int, entry["timepoints"])),
@@ -480,6 +534,7 @@ class SessionService:
             echo.echo_id = f"echo_{finalize_echo.echo_index}"
             echo.display_name = f"Echo {finalize_echo.echo_index}"
             echo.issues = []
+            echo.active_asset_id = echo.asset_id
             echo.volume_url = self._asset_url(session_id, dataset.dataset_id, echo.asset_id)
         dataset.echoes.sort(key=lambda echo: echo.echo_index or 0)
         dataset.state = DatasetState.READY
@@ -608,6 +663,16 @@ class SessionService:
     def _infer_echo_index(self, filename: str) -> int | None:
         match = ECHO_PATTERN.search(filename)
         return int(match.group(1)) if match else None
+
+    def _sort_dataset_entries(self, entries: list[dict[str, object]]) -> list[dict[str, object]]:
+        return sorted(
+            entries,
+            key=lambda entry: (
+                entry["echo_index"] is None,
+                entry["echo_index"] or 0,
+                str(entry["filename"]),
+            ),
+        )
 
     def _infer_echo_time(self, filename: str) -> float | None:
         match = TIME_PATTERN.search(filename)

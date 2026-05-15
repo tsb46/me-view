@@ -55,12 +55,78 @@ export async function fetchPlotContext({ sessionId, datasetId, voxel, echoId, ti
   return handleJson(response)
 }
 
+function formatValidationError(detail) {
+  if (!detail || typeof detail !== 'object') {
+    return null
+  }
+
+  const message = typeof detail.msg === 'string' ? detail.msg : null
+  const location = Array.isArray(detail.loc) ? detail.loc.join(' > ') : null
+  if (message && location) {
+    return `${location}: ${message}`
+  }
+  return message
+}
+
+function formatStructuredDetail(detail, fallback) {
+  if (!detail || typeof detail !== 'object') {
+    return fallback
+  }
+
+  if (typeof detail.message === 'string') {
+    const parts = [detail.message]
+    if (Number.isFinite(detail.expected_echoes_per_dataset)) {
+      const expectedCount = Number(detail.expected_echoes_per_dataset)
+      parts.push(`Expected ${expectedCount} echo time${expectedCount === 1 ? '' : 's'} per dataset.`)
+    }
+
+    if (detail.dataset_echo_counts && typeof detail.dataset_echo_counts === 'object') {
+      const datasetCounts = Object.entries(detail.dataset_echo_counts)
+        .map(([datasetKey, count]) => `${datasetKey}: ${count}`)
+        .join(', ')
+      if (datasetCounts) {
+        parts.push(`Resolved dataset echo counts: ${datasetCounts}.`)
+      }
+    }
+
+    return parts.join(' ')
+  }
+
+  const stringValues = Object.values(detail).filter((value) => typeof value === 'string')
+  return stringValues[0] ?? fallback
+}
+
+function formatErrorPayload(payload, fallback) {
+  if (!payload || typeof payload !== 'object') {
+    return fallback
+  }
+
+  if (typeof payload.detail === 'string') {
+    return payload.detail
+  }
+
+  if (Array.isArray(payload.detail)) {
+    const messages = payload.detail.map(formatValidationError).filter(Boolean)
+    return messages.join(' ') || fallback
+  }
+
+  if (payload.detail && typeof payload.detail === 'object') {
+    return formatStructuredDetail(payload.detail, fallback)
+  }
+
+  if (typeof payload.message === 'string') {
+    return payload.message
+  }
+
+  return fallback
+}
+
 async function handleJson(response) {
   if (!response.ok) {
     let detail = 'Request failed'
     try {
       const payload = await response.json()
-      detail = typeof payload.detail === 'string' ? payload.detail : detail
+      detail = formatErrorPayload(payload, detail)
     } catch {
       detail = response.statusText || detail
     }

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import Plot from 'react-plotly.js'
 
 import { fetchEchoCurve, fetchPlotContext, fetchTimeCourse } from '../lib/api'
+import { getTimeAxisTitle, normalizeTimeDisplayMode, timepointToSeconds } from '../lib/time'
 import { useAppDispatch, useAppState, useActiveDataset } from '../state/app-state'
 
 const PLOT_BUFFER_MS = 100
@@ -23,6 +24,16 @@ function hasVoxelSelection(value) {
   return value != null && typeof value.length === 'number' && value.length >= 3
 }
 
+function getTimeSeriesXValue(point, dataset, timeDisplayMode) {
+  if (normalizeTimeDisplayMode(timeDisplayMode, dataset) === 'seconds') {
+    if (point.time_ms != null) {
+      return point.time_ms / 1000
+    }
+    return timepointToSeconds(point.timepoint, dataset?.tr_ms) ?? point.timepoint
+  }
+  return point.timepoint
+}
+
 export default function PlotPanel() {
   const state = useAppState()
   const dispatch = useAppDispatch()
@@ -41,6 +52,13 @@ export default function PlotPanel() {
   const timeCourse = state.plots.timeCourse.data
   const echoCurveState = state.plots.echoCurve
   const timeCourseState = state.plots.timeCourse
+  const timeDisplayMode = normalizeTimeDisplayMode(state.plots.chartPrefs.timeDisplayMode, dataset)
+  const echoCurveUsesEchoTime = Boolean(echoCurve?.echoes?.length) && echoCurve.echoes.every((point) => point.echo_time_ms != null)
+  const echoCurveXAxisTitle = echoCurveUsesEchoTime ? 'Echo Time (ms)' : 'Echo'
+  const timeSeriesX = timeCourse?.series?.map((point) => getTimeSeriesXValue(point, dataset, timeDisplayMode)) ?? []
+  const selectedTimeSeriesX = hasVoxelSelection(voxel)
+    ? timeSeriesX[selectedTimepoint] ?? getTimeSeriesXValue({ timepoint: selectedTimepoint }, dataset, timeDisplayMode)
+    : null
 
   useEffect(() => {
     if (!sessionId || !sessionReady || !datasetId || !voxel) {
@@ -336,10 +354,10 @@ export default function PlotPanel() {
               {
                 type: 'scatter',
                 mode: 'lines+markers',
-                x: echoCurve.echoes.map((point) => point.echo_time_ms ?? point.echo_index),
+                x: echoCurve.echoes.map((point) => (echoCurveUsesEchoTime ? point.echo_time_ms : point.echo_index)),
                 y: echoCurve.echoes.map((point) => point.value),
                 marker: {
-                  color: echoCurve.echoes.map((point) => (point.is_active ? '#d44f2a' : '#1b6b73')),
+                  color: echoCurve.echoes.map((point) => (point.echo_id === activeEchoId ? '#d44f2a' : '#1b6b73')),
                   size: 11,
                 },
                 line: { color: '#0f3b46', width: 3 },
@@ -350,7 +368,7 @@ export default function PlotPanel() {
               margin: { l: 48, r: 20, t: 24, b: 44 },
               paper_bgcolor: '#f3efe6',
               plot_bgcolor: '#fdf9f1',
-              xaxis: { title: 'Echo Time (ms)' },
+              xaxis: { title: echoCurveXAxisTitle },
               yaxis: { title: 'Signal' },
             }}
             config={{ responsive: true, displayModeBar: false }}
@@ -372,7 +390,7 @@ export default function PlotPanel() {
               {
                 type: 'scattergl',
                 mode: 'lines',
-                x: timeCourse.series.map((point) => point.time_ms ?? point.timepoint),
+                x: timeSeriesX,
                 y: timeCourse.series.map((point) => point.value),
                 line: { color: '#1b6b73', width: 2 },
               },
@@ -382,14 +400,14 @@ export default function PlotPanel() {
               margin: { l: 48, r: 20, t: 24, b: 44 },
               paper_bgcolor: '#f3efe6',
               plot_bgcolor: '#fdf9f1',
-              xaxis: { title: 'Time (ms)' },
+              xaxis: { title: getTimeAxisTitle(dataset, timeDisplayMode) },
               yaxis: { title: 'Signal' },
-              shapes: timeCourse.selected_timepoint != null
+              shapes: selectedTimeSeriesX != null
                 ? [
                     {
                       type: 'line',
-                      x0: timeCourse.series[timeCourse.selected_timepoint]?.time_ms ?? timeCourse.selected_timepoint,
-                      x1: timeCourse.series[timeCourse.selected_timepoint]?.time_ms ?? timeCourse.selected_timepoint,
+                      x0: selectedTimeSeriesX,
+                      x1: selectedTimeSeriesX,
                       y0: 0,
                       y1: 1,
                       yref: 'paper',

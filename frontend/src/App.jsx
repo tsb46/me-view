@@ -3,6 +3,7 @@ import InspectorPanel from './components/InspectorPanel'
 import PlotPanel from './components/PlotPanel'
 import ReviewPanel from './components/ReviewPanel'
 import SessionBanner from './components/SessionBanner'
+import TimeSliderPanel from './components/TimeSliderPanel'
 import UploadPanel from './components/UploadPanel'
 import ViewerWorkspace from './components/ViewerWorkspace'
 import { AppStateProvider, useAppState } from './state/app-state'
@@ -34,6 +35,7 @@ function Workspace() {
 
       <main className="main-grid">
         <ViewerWorkspace />
+        <TimeSliderPanel />
         <section className="analytics-grid">
           <PlotPanel />
           <InspectorPanel />

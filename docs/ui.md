@@ -7,6 +7,11 @@
 - Plotly panels on the right
 - Inspector panel under the charts
 
+## Rendering panel
+
+- The Rendering section includes colormap, display range, time display, and crosshair controls
+- Display min and max are discovered per rendered echo volume and stay synchronized within the active dataset
+
 ## Quantitative panels
 
 - Echo curve: selected voxel at selected timepoint across all echoes

@@ -1,4 +1,5 @@
 import { useAppState, useActiveDataset } from '../state/app-state'
+import { formatDatasetEchoTimes, formatDisplayedTimepoint, normalizeTimeDisplayMode } from '../lib/time'
 
 function formatStatus(status) {
   return status.replaceAll('_', ' ')
@@ -16,6 +17,8 @@ export default function SessionBanner() {
   const state = useAppState()
   const dataset = useActiveDataset()
   const activeReviewAction = getReviewActionForDataset(state.session, dataset?.dataset_id)
+  const timeDisplayMode = normalizeTimeDisplayMode(state.plots.chartPrefs.timeDisplayMode, dataset)
+  const datasetEchoTimes = formatDatasetEchoTimes(dataset)
 
   if (!state.session.sessionId) {
     return null
@@ -63,11 +66,17 @@ export default function SessionBanner() {
 
       {state.session.status === 'ready' && dataset ? (
         <p className="session-banner-copy">
-          Selected echo: <strong>{state.selection.activeEchoId ?? 'None'}</strong> · Timepoint:{' '}
-          <strong>{state.selection.selectedTimepoint}</strong> · Voxel:{' '}
+          Selected echo: <strong>{state.selection.activeEchoId ?? 'None'}</strong> · {timeDisplayMode === 'seconds' ? 'Time' : 'Timepoint'}:{' '}
+          <strong>{formatDisplayedTimepoint(state.selection.selectedTimepoint, dataset, timeDisplayMode)}</strong> · Voxel:{' '}
           <strong>
             {state.selection.selectedVoxelIJK ? state.selection.selectedVoxelIJK.join(', ') : 'Not selected'}
           </strong>
+        </p>
+      ) : null}
+
+      {dataset && datasetEchoTimes ? (
+        <p className="session-banner-copy">
+          Echo times: <strong>{datasetEchoTimes}</strong>
         </p>
       ) : null}
 
