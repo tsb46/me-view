@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { NVImage } from '@niivue/niivue'
 
@@ -22,12 +22,25 @@ function formatRangeValue(value) {
   return value.toFixed(3)
 }
 
+function normalizeRangeInput(value) {
+  if (!Number.isFinite(value)) {
+    return ''
+  }
+
+  return String(value)
+}
+
+function isIncompleteNumericInput(value) {
+  return value === '' || value === '-' || value === '+' || value === '.' || value === '-.' || value === '+.'
+}
+
 export default function ControlBar() {
   const state = useAppState()
   const dispatch = useAppDispatch()
   const dataset = useActiveDataset()
   const renderPrefs = useActiveRenderPreferences()
   const pendingLoadsRef = useRef(new Set())
+  const [rangeInputs, setRangeInputs] = useState({ min: '', max: '' })
 
   useEffect(() => {
     if (!dataset || state.session.status !== 'ready') {
@@ -87,17 +100,55 @@ export default function ControlBar() {
     }
   }, [dataset, dispatch, state.session.status, state.viewerUI.renderMetaByDatasetId])
 
-  if (!state.session.sessionId || !dataset || state.session.status !== 'ready') {
-    return null
-  }
-
   const globalMin = renderPrefs?.globalMin
   const globalMax = renderPrefs?.globalMax
   const displayMin = renderPrefs?.displayMin ?? globalMin ?? 0
   const displayMax = renderPrefs?.displayMax ?? globalMax ?? 0
+
+  useEffect(() => {
+    setRangeInputs({
+      min: normalizeRangeInput(displayMin),
+      max: normalizeRangeInput(displayMax),
+    })
+  }, [dataset?.dataset_id, displayMax, displayMin])
+
+  if (!state.session.sessionId || !dataset || state.session.status !== 'ready') {
+    return null
+  }
+
   const hasBounds = Number.isFinite(globalMin) && Number.isFinite(globalMax)
   const canDisplaySeconds = datasetSupportsSeconds(dataset)
   const timeDisplayMode = state.plots.chartPrefs.timeDisplayMode
+
+  function handleRangeTextChange(key, actionType) {
+    return (event) => {
+      const nextValue = event.target.value
+      setRangeInputs((current) => ({ ...current, [key]: nextValue }))
+
+      if (isIncompleteNumericInput(nextValue)) {
+        return
+      }
+
+      const parsedValue = Number(nextValue)
+      if (!Number.isFinite(parsedValue)) {
+        return
+      }
+
+      dispatch({
+        type: actionType,
+        payload: { datasetId: dataset.dataset_id, value: parsedValue },
+      })
+    }
+  }
+
+  function handleRangeTextBlur(key, value) {
+    return () => {
+      setRangeInputs((current) => ({
+        ...current,
+        [key]: normalizeRangeInput(value),
+      }))
+    }
+  }
 
   return (
     <div className="control-panels">
@@ -208,37 +259,61 @@ export default function ControlBar() {
             </select>
           </label>
 
-          <label className="range-control">
+          <label className="range-control range-control-precise">
             Min
-            <input
-              type="range"
-              min={hasBounds ? globalMin : 0}
-              max={hasBounds ? displayMax : 0}
-              step="any"
-              value={displayMin}
-              disabled={!hasBounds}
-              onChange={(event) => dispatch({
-                type: 'render_min_changed',
-                payload: { datasetId: dataset.dataset_id, value: Number(event.target.value) },
-              })}
-            />
+            <div className="range-control-body">
+              <input
+                type="range"
+                min={hasBounds ? globalMin : 0}
+                max={hasBounds ? displayMax : 0}
+                step="any"
+                value={displayMin}
+                disabled={!hasBounds}
+                onChange={(event) => dispatch({
+                  type: 'render_min_changed',
+                  payload: { datasetId: dataset.dataset_id, value: Number(event.target.value) },
+                })}
+              />
+              <input
+                type="number"
+                inputMode="decimal"
+                step="any"
+                value={rangeInputs.min}
+                disabled={!hasBounds}
+                onChange={handleRangeTextChange('min', 'render_min_changed')}
+                onBlur={handleRangeTextBlur('min', displayMin)}
+                aria-label="Minimum color range"
+              />
+            </div>
             <span>{formatRangeValue(displayMin)}</span>
           </label>
 
-          <label className="range-control">
+          <label className="range-control range-control-precise">
             Max
-            <input
-              type="range"
-              min={hasBounds ? displayMin : 0}
-              max={hasBounds ? globalMax : 0}
-              step="any"
-              value={displayMax}
-              disabled={!hasBounds}
-              onChange={(event) => dispatch({
-                type: 'render_max_changed',
-                payload: { datasetId: dataset.dataset_id, value: Number(event.target.value) },
-              })}
-            />
+            <div className="range-control-body">
+              <input
+                type="range"
+                min={hasBounds ? displayMin : 0}
+                max={hasBounds ? globalMax : 0}
+                step="any"
+                value={displayMax}
+                disabled={!hasBounds}
+                onChange={(event) => dispatch({
+                  type: 'render_max_changed',
+                  payload: { datasetId: dataset.dataset_id, value: Number(event.target.value) },
+                })}
+              />
+              <input
+                type="number"
+                inputMode="decimal"
+                step="any"
+                value={rangeInputs.max}
+                disabled={!hasBounds}
+                onChange={handleRangeTextChange('max', 'render_max_changed')}
+                onBlur={handleRangeTextBlur('max', displayMax)}
+                aria-label="Maximum color range"
+              />
+            </div>
             <span>{formatRangeValue(displayMax)}</span>
           </label>
 
